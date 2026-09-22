@@ -9,51 +9,46 @@ from tools.weather import get_weather
 
 class GetWeatherTests(unittest.TestCase):
     @patch("tools.weather.requests.get")
-    @patch("tools.weather.load_weather_api_key", return_value="weather-key")
-    def test_returns_normalized_current_weather(self, mock_key, mock_get) -> None:
-        response = MagicMock()
-        response.json.return_value = {
-            "location": {"name": "Shanghai", "country": "China"},
-            "current": {
-                "condition": {"text": "Sunny"},
-                "temp_c": 25.0,
-                "feelslike_c": 26.1,
+    def test_returns_current_weather_and_three_day_forecast(self, mock_get) -> None:
+        geocoding_response = MagicMock()
+        geocoding_response.json.return_value = {
+            "results": [{"name": "上海", "country": "中国", "latitude": 31.23, "longitude": 121.47}]
+        }
+        weather_response = MagicMock()
+        weather_response.json.return_value = {
+            "current": {"weather_code": 0, "temperature_2m": 25.0, "apparent_temperature": 26.1},
+            "daily": {
+                "time": ["2026-09-22", "2026-09-23", "2026-09-24"],
+                "weather_code": [0, 3, 61],
+                "temperature_2m_max": [28.0, 27.0, 24.0],
+                "temperature_2m_min": [20.0, 21.0, 19.0],
+                "precipitation_probability_max": [0, 10, 60],
             },
         }
-        mock_get.return_value = response
+        mock_get.side_effect = [geocoding_response, weather_response]
 
         result = json.loads(get_weather.invoke({"location": "上海"}))
 
-        mock_get.assert_called_once_with(
-            "https://api.weatherapi.com/v1/current.json",
-            params={"key": "weather-key", "q": "上海", "aqi": "no", "alerts": "no"},
-            timeout=10,
-        )
-        response.raise_for_status.assert_called_once_with()
-        self.assertEqual(
-            result,
-            {
-                "location": "Shanghai",
-                "country": "China",
-                "condition": "Sunny",
-                "temperature_c": 25.0,
-                "feelslike_c": 26.1,
-            },
-        )
-
-    @patch("tools.weather.load_weather_api_key")
-    def test_propagates_missing_key_error(self, mock_key) -> None:
-        mock_key.side_effect = RuntimeError("WEATHER_API_KEY is required")
-
-        with self.assertRaisesRegex(RuntimeError, "WEATHER_API_KEY is required"):
-            get_weather.invoke({"location": "上海"})
+        self.assertEqual(mock_get.call_count, 2)
+        self.assertEqual(result["location"], "上海")
+        self.assertEqual(result["current"]["condition"], "晴")
+        self.assertEqual(result["forecast"][2]["condition"], "雨")
+        self.assertEqual(len(result["forecast"]), 3)
 
     @patch("tools.weather.requests.get")
-    @patch("tools.weather.load_weather_api_key", return_value="weather-key")
-    def test_propagates_weather_service_error(self, mock_key, mock_get) -> None:
+    def test_raises_when_location_is_not_found(self, mock_get) -> None:
+        geocoding_response = MagicMock()
+        geocoding_response.json.return_value = {"results": []}
+        mock_get.return_value = geocoding_response
+
+        with self.assertRaisesRegex(ValueError, "未找到地点"):
+            get_weather.invoke({"location": "不存在的地点"})
+
+    @patch("tools.weather.requests.get")
+    def test_propagates_weather_service_error(self, mock_get) -> None:
         response = MagicMock()
-        response.raise_for_status.side_effect = requests.HTTPError("401 Client Error")
+        response.raise_for_status.side_effect = requests.HTTPError("503 Service Unavailable")
         mock_get.return_value = response
 
-        with self.assertRaisesRegex(requests.HTTPError, "401 Client Error"):
+        with self.assertRaisesRegex(requests.HTTPError, "503 Service Unavailable"):
             get_weather.invoke({"location": "上海"})
