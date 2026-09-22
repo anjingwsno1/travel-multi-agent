@@ -3,6 +3,7 @@ import unittest
 from unittest.mock import patch
 
 from app.config import load_settings
+from app.config import load_ark_api_key
 
 
 class LoadSettingsTests(unittest.TestCase):
@@ -17,3 +18,8 @@ class LoadSettingsTests(unittest.TestCase):
         with patch.dict(os.environ, {}, clear=True):
             with self.assertRaisesRegex(RuntimeError, "DEEPSEEK_API_KEY is required"):
                 load_settings()
+
+    @patch("app.config.load_dotenv")
+    def test_returns_ark_key_from_environment(self, mock_load_dotenv) -> None:
+        with patch.dict(os.environ, {"ARK_API_KEY": "ark-key"}, clear=True):
+            self.assertEqual(load_ark_api_key(), "ark-key")
