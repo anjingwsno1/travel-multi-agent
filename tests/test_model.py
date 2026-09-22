@@ -2,7 +2,7 @@ import unittest
 from unittest.mock import MagicMock, patch
 
 from app.config import Settings
-from app.model import ask_model
+from app.model import ask_model, create_chat_model
 
 
 class AskModelTests(unittest.TestCase):
@@ -22,3 +22,14 @@ class AskModelTests(unittest.TestCase):
         )
         mock_chat_openai.return_value.invoke.assert_called_once_with("上海适合旅行吗？")
         self.assertEqual(result, "上海很适合旅行。")
+
+    @patch("app.model.ChatOpenAI")
+    @patch("app.model.load_settings", return_value=Settings(deepseek_api_key="test-key"))
+    def test_creates_deepseek_compatible_chat_model(self, mock_settings, mock_chat_openai) -> None:
+        create_chat_model()
+
+        mock_chat_openai.assert_called_once_with(
+            model="deepseek-flash",
+            api_key="test-key",
+            base_url="https://api.deepseek.com",
+        )

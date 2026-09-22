@@ -30,7 +30,7 @@ class GenerateImageTests(unittest.TestCase):
         mock_openai.return_value.images.generate.assert_called_once_with(
             model="doubao-seedream-5-0-lite-260128",
             prompt="上海外滩日落",
-            size="1024x1024",
+            size="1920x1920",
             response_format="url",
         )
         mock_get.assert_called_once_with("https://example.com/image.png", timeout=30)
