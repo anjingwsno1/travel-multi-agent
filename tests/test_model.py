@@ -19,6 +19,7 @@ class AskModelTests(unittest.TestCase):
             model="deepseek-flash",
             api_key="test-key",
             base_url="https://api.deepseek.com",
+            extra_body={"thinking": {"type": "disabled"}},
         )
         mock_chat_openai.return_value.invoke.assert_called_once_with("上海适合旅行吗？")
         self.assertEqual(result, "上海很适合旅行。")
@@ -32,4 +33,5 @@ class AskModelTests(unittest.TestCase):
             model="deepseek-flash",
             api_key="test-key",
             base_url="https://api.deepseek.com",
+            extra_body={"thinking": {"type": "disabled"}},
         )

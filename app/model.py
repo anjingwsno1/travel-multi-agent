@@ -10,6 +10,7 @@ def create_chat_model(model_name: str = "deepseek-flash") -> ChatOpenAI:
         model=model_name,
         api_key=settings.deepseek_api_key,
         base_url="https://api.deepseek.com",
+        extra_body={"thinking": {"type": "disabled"}},
     )
 
 
