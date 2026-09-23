@@ -7,6 +7,7 @@ from app.multi_agent import (
     LANGUAGE_ADVISOR,
     TRAVEL_PLANNER,
     VISUALIZER,
+    REPORTER,
     build_multi_agent,
 )
 
@@ -28,6 +29,10 @@ def route_in_order(state):
     return FINISH
 
 
+def mock_reporter(state):
+    return {"messages": [HumanMessage(content="/output/travel.pdf", name="reporter")], "pdf_path": "/output/travel.pdf"}
+
+
 class MultiAgentGraphTests(unittest.TestCase):
     def test_supervisor_routes_all_workers_before_finishing(self) -> None:
         workers = {
@@ -35,7 +40,7 @@ class MultiAgentGraphTests(unittest.TestCase):
             LANGUAGE_ADVISOR: make_worker(LANGUAGE_ADVISOR, "常用表达"),
             VISUALIZER: make_worker(VISUALIZER, "/images/shanghai.png"),
         }
-        graph = build_multi_agent(router=route_in_order, workers=workers)
+        graph = build_multi_agent(router=route_in_order, workers=workers, reporter=mock_reporter)
 
         result = graph.invoke(
             {"messages": [HumanMessage(content="规划上海三日游")], "completed": []}
@@ -44,6 +49,8 @@ class MultiAgentGraphTests(unittest.TestCase):
         self.assertEqual(result["completed"], [TRAVEL_PLANNER, LANGUAGE_ADVISOR, VISUALIZER])
         self.assertEqual(
             [message.name for message in result["messages"] if getattr(message, "name", None)],
-            [TRAVEL_PLANNER, LANGUAGE_ADVISOR, VISUALIZER],
+            [TRAVEL_PLANNER, LANGUAGE_ADVISOR, VISUALIZER, REPORTER],
         )
-        self.assertEqual(result["messages"][-1].content, "/images/shanghai.png")
+        self.assertEqual(result["messages"][-2].content, "/images/shanghai.png")
+        self.assertEqual(result["messages"][-1].content, "/output/travel.pdf")
+        self.assertEqual(result["pdf_path"], "/output/travel.pdf")

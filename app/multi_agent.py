@@ -9,13 +9,14 @@ from langgraph.prebuilt import create_react_agent
 from pydantic import BaseModel
 
 from app.model import create_chat_model
-from tools import generate_image, get_weather
+from tools import create_travel_pdf, generate_image, get_weather
 
 
 TRAVEL_PLANNER = "travel_planner"
 LANGUAGE_ADVISOR = "language_advisor"
 VISUALIZER = "visualizer"
 FINISH = "FINISH"
+REPORTER = "reporter"
 MEMBERS = [TRAVEL_PLANNER, LANGUAGE_ADVISOR, VISUALIZER]
 
 
@@ -23,6 +24,7 @@ class MultiAgentState(TypedDict):
     messages: Annotated[Sequence[BaseMessage], operator.add]
     completed: Annotated[Sequence[str], operator.add]
     next: str
+    pdf_path: str
 
 
 class Route(BaseModel):
@@ -80,7 +82,41 @@ def create_supervisor_router(model) -> Callable[[MultiAgentState], str]:
     return route
 
 
-def build_multi_agent(model=None, router=None, workers: dict[str, Callable] | None = None):
+def build_travel_markdown(messages: Sequence[BaseMessage]) -> str:
+    contributions = {
+        message.name: str(message.content)
+        for message in messages
+        if getattr(message, "name", None) in MEMBERS
+    }
+    visual_path = contributions.get(VISUALIZER, "")
+    itinerary = contributions.get(TRAVEL_PLANNER, "暂未生成行程。")
+    language_tips = contributions.get(LANGUAGE_ADVISOR, "暂未生成语言建议。")
+    image_section = f"![旅行配图]({visual_path})\n\n" if visual_path else ""
+    return (
+        "# 旅行方案\n\n"
+        f"{image_section}"
+        "## 行程安排\n\n"
+        f"{itinerary}\n\n"
+        "## 语言与沟通建议\n\n"
+        f"{language_tips}\n"
+    )
+
+
+def create_reporter_node(state: MultiAgentState):
+    markdown_text = build_travel_markdown(state["messages"])
+    pdf_path = create_travel_pdf.invoke({"markdown_text": markdown_text})
+    return {
+        "messages": [HumanMessage(content=pdf_path, name=REPORTER)],
+        "pdf_path": pdf_path,
+    }
+
+
+def build_multi_agent(
+    model=None,
+    router=None,
+    workers: dict[str, Callable] | None = None,
+    reporter: Callable | None = None,
+):
     """Build a supervisor-routed travel team workflow."""
     if workers is None or router is None:
         active_model = model or create_chat_model()
@@ -99,13 +135,15 @@ def build_multi_agent(model=None, router=None, workers: dict[str, Callable] | No
     for name, worker in active_workers.items():
         workflow.add_node(name, worker)
         workflow.add_edge(name, "supervisor")
+    workflow.add_node(REPORTER, reporter or create_reporter_node)
 
     workflow.add_edge(START, "supervisor")
     workflow.add_conditional_edges(
         "supervisor",
         lambda state: state["next"],
-        {**{name: name for name in MEMBERS}, FINISH: END},
+        {**{name: name for name in MEMBERS}, FINISH: REPORTER},
     )
+    workflow.add_edge(REPORTER, END)
     return workflow.compile()
 
 
@@ -114,9 +152,4 @@ def run_multi_agent(query: str) -> str:
     result = build_multi_agent().invoke(
         {"messages": [HumanMessage(content=query)], "completed": []}
     )
-    contributions = [
-        f"## {message.name}\n{message.content}"
-        for message in result["messages"]
-        if getattr(message, "name", None) in MEMBERS
-    ]
-    return "\n\n".join(contributions)
+    return str(result["pdf_path"])
