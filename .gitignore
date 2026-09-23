@@ -6,4 +6,3 @@ images/*
 !images/.gitkeep
 output/*
 !output/.gitkeep
-README.md
