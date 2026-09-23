@@ -4,6 +4,8 @@ import requests
 from langchain_core.tools import tool
 from pydantic import BaseModel, Field
 
+from app.observability import get_logger
+
 class WeatherInput(BaseModel):
     location: str = Field(description="要查询天气的城市或地点名称。")
 
@@ -11,6 +13,8 @@ class WeatherInput(BaseModel):
 @tool("get_weather", args_schema=WeatherInput)
 def get_weather(location: str) -> str:
     """获取指定城市的当前天气和未来三天预报。"""
+    logger = get_logger()
+    logger.info("event=tool.start tool=get_weather")
     geocoding_response = requests.get(
         "https://geocoding-api.open-meteo.com/v1/search",
         params={"name": location, "count": 1, "language": "zh", "format": "json"},
@@ -19,6 +23,7 @@ def get_weather(location: str) -> str:
     geocoding_response.raise_for_status()
     results = geocoding_response.json().get("results", [])
     if not results:
+        logger.warning("event=tool.not_found tool=get_weather")
         raise ValueError(f"未找到地点：{location}")
 
     place = results[0]
@@ -49,7 +54,7 @@ def get_weather(location: str) -> str:
         for index in range(len(daily["time"]))
     ]
 
-    return json.dumps(
+    result = json.dumps(
         {
             "location": place["name"],
             "country": place.get("country"),
@@ -62,6 +67,8 @@ def get_weather(location: str) -> str:
         },
         ensure_ascii=False,
     )
+    logger.info("event=tool.success tool=get_weather forecast_days=%d", len(forecast))
+    return result
 
 
 def weather_code_to_text(weather_code: int) -> str:

@@ -12,6 +12,7 @@ from reportlab.pdfbase import pdfmetrics
 from reportlab.pdfbase.cidfonts import UnicodeCIDFont
 from reportlab.platypus import Image, Paragraph, SimpleDocTemplate, Spacer
 
+from app.observability import get_logger
 
 OUTPUT_DIRECTORY = Path(__file__).resolve().parent.parent / "output" / "pdf"
 IMAGE_PATTERN = re.compile(r"!\[[^\]]*\]\(([^)]+)\)")
@@ -19,6 +20,8 @@ IMAGE_PATTERN = re.compile(r"!\[[^\]]*\]\(([^)]+)\)")
 
 def markdown_to_pdf(markdown_text: str) -> str:
     """Render the supported travel-plan Markdown subset to a local PDF file."""
+    logger = get_logger()
+    logger.info("event=tool.start tool=create_travel_pdf")
     pdfmetrics.registerFont(UnicodeCIDFont("STSong-Light"))
     styles = getSampleStyleSheet()
     title_style = ParagraphStyle(
@@ -84,6 +87,7 @@ def markdown_to_pdf(markdown_text: str) -> str:
         bottomMargin=1.8 * cm,
     )
     document.build(story)
+    logger.info("event=tool.success tool=create_travel_pdf")
     return str(pdf_path)
 
 

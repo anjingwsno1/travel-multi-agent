@@ -9,6 +9,7 @@ from langgraph.prebuilt import create_react_agent
 from pydantic import BaseModel
 
 from app.model import create_chat_model
+from app.observability import get_logger
 from tools import create_travel_pdf, generate_image, get_weather
 
 
@@ -45,8 +46,11 @@ def create_worker_node(name: str, model, tools: list[BaseTool]):
     worker = create_react_agent(model, tools, state_modifier=WORKER_PROMPTS[name])
 
     def worker_node(state: MultiAgentState):
+        logger = get_logger()
+        logger.info("event=worker.start worker=%s", name)
         result = worker.invoke({"messages": state["messages"]})
         final_message = result["messages"][-1]
+        logger.info("event=worker.success worker=%s", name)
         return {
             "messages": [HumanMessage(content=str(final_message.content), name=name)],
             "completed": [name],
@@ -77,6 +81,7 @@ def create_supervisor_router(model) -> Callable[[MultiAgentState], str]:
                 "completed": ", ".join(state["completed"]) or "无",
             }
         )
+        get_logger().info("event=supervisor.route next=%s", decision.next)
         return decision.next
 
     return route
@@ -103,8 +108,10 @@ def build_travel_markdown(messages: Sequence[BaseMessage]) -> str:
 
 
 def create_reporter_node(state: MultiAgentState):
+    get_logger().info("event=reporter.start")
     markdown_text = build_travel_markdown(state["messages"])
     pdf_path = create_travel_pdf.invoke({"markdown_text": markdown_text})
+    get_logger().info("event=reporter.success")
     return {
         "messages": [HumanMessage(content=pdf_path, name=REPORTER)],
         "pdf_path": pdf_path,
@@ -149,7 +156,9 @@ def build_multi_agent(
 
 def run_multi_agent(query: str) -> str:
     """Run the complete travel team and combine each role's final contribution."""
+    get_logger().info("event=workflow.start workflow=multi_agent")
     result = build_multi_agent().invoke(
         {"messages": [HumanMessage(content=query)], "completed": []}
     )
+    get_logger().info("event=workflow.success workflow=multi_agent")
     return str(result["pdf_path"])
