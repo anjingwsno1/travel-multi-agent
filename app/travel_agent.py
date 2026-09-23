@@ -5,6 +5,7 @@ from langchain_core.messages import AIMessage, BaseMessage, HumanMessage
 from langchain_core.tools import BaseTool
 from langgraph.graph import END, START, StateGraph
 from langgraph.prebuilt import ToolNode
+from langsmith import traceable
 
 from app.model import create_chat_model
 from tools import generate_image, get_weather
@@ -41,6 +42,11 @@ def build_travel_agent(model=None, tools: list[BaseTool] | None = None):
     return workflow.compile()
 
 
+@traceable(
+    name="travel_single_agent",
+    run_type="chain",
+    metadata={"application": "travel-multi-agent", "workflow": "single_agent"},
+)
 def run_travel_agent(query: str) -> str:
     """Run the travel agent for one user query and return the final text answer."""
     result = build_travel_agent().invoke({"messages": [HumanMessage(content=query)]})

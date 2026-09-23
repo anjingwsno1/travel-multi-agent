@@ -6,6 +6,7 @@ from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
 from langchain_core.tools import BaseTool
 from langgraph.graph import END, START, StateGraph
 from langgraph.prebuilt import create_react_agent
+from langsmith import traceable
 from pydantic import BaseModel
 
 from app.model import create_chat_model
@@ -167,6 +168,11 @@ def build_multi_agent(
     return workflow.compile()
 
 
+@traceable(
+    name="travel_multi_agent",
+    run_type="chain",
+    metadata={"application": "travel-multi-agent", "workflow": "multi_agent"},
+)
 def run_multi_agent(query: str) -> str:
     """Run the complete travel team and combine each role's final contribution."""
     get_logger().info("event=workflow.start workflow=multi_agent")
