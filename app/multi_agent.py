@@ -81,7 +81,6 @@ def create_supervisor_router(model) -> Callable[[MultiAgentState], str]:
                 "completed": ", ".join(state["completed"]) or "无",
             }
         )
-        get_logger().info("event=supervisor.route next=%s", decision.next)
         return decision.next
 
     return route
@@ -137,8 +136,22 @@ def build_multi_agent(
     }
     active_router = router or create_supervisor_router(active_model)
 
+    def route_next(state: MultiAgentState) -> str:
+        pending_members = [name for name in MEMBERS if name not in state["completed"]]
+        requested_next = active_router(state)
+        if not pending_members:
+            selected_next = FINISH
+        elif requested_next in pending_members:
+            selected_next = requested_next
+        else:
+            selected_next = pending_members[0]
+        get_logger().info(
+            "event=supervisor.route requested=%s selected=%s", requested_next, selected_next
+        )
+        return selected_next
+
     workflow = StateGraph(MultiAgentState)
-    workflow.add_node("supervisor", lambda state: {"next": active_router(state)})
+    workflow.add_node("supervisor", lambda state: {"next": route_next(state)})
     for name, worker in active_workers.items():
         workflow.add_node(name, worker)
         workflow.add_edge(name, "supervisor")

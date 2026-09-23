@@ -1,0 +1,27 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Travel Multi-Agent</title>
+    <link rel="stylesheet" href="/style.css">
+  </head>
+  <body>
+    <main class="container">
+      <h1>旅行规划助手</h1>
+      <p class="subtitle">描述目的地、天数、偏好和预算，团队会生成一份 PDF 旅行方案。</p>
+      <form id="travel-form">
+        <label for="query">旅行需求</label>
+        <textarea id="query" name="query" rows="8" required placeholder="例如：规划上海三日游，偏好本地美食和博物馆，预算 3000 元。"></textarea>
+        <button type="submit">生成旅行方案</button>
+      </form>
+      <p id="status" role="status"></p>
+      <section id="result" hidden>
+        <h2>方案已生成</h2>
+        <a id="download-link" href="">下载 PDF 旅行方案</a>
+        <iframe id="pdf-preview" title="旅行方案 PDF 预览"></iframe>
+      </section>
+    </main>
+    <script src="/app.js"></script>
+  </body>
+</html>
